@@ -46,6 +46,7 @@ for batch_count in range(20):
     data = training_set.sample(n=BATCH_SIZE)
     input, label = data['index_tree'], torch.tensor([label - 1 for label in data['label']])
 
+    net.zero_grad()
     output = net(input)
 
     # label = label.cuda()

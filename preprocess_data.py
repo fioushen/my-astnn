@@ -79,6 +79,8 @@ class Preprocessor:
         programs['index_tree'] = programs['ast'].apply(ast_to_index)
 
         # programs['token_seq'] = programs['index_tree'].apply(index_to_tokens)
+        programs.pop('code')
+        programs.pop('ast')
 
         w2v.save(self.w2v_path)
         print("Saved word2vec model at", self.w2v_path)
