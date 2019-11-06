@@ -41,7 +41,12 @@ class Preprocessor:
         # read data, it's a DataFrame with 3 columns:
         # id(int), code(code text), label(int)
         print('Reading data...')
-        programs = pd.read_pickle(self.raw_data_path)[:self.entry_num]
+        programs = pd.read_pickle(self.raw_data_path)
+        if self.entry_num >= 0:
+            programs = programs.sample(n=self.entry_num)
+        else:
+            programs = programs.sample(frac=1)
+        programs = programs.reset_index(drop=True)
         programs.columns = ['id', 'code', 'label']
 
         print('Parsing to AST...')
@@ -73,7 +78,7 @@ class Preprocessor:
         print('Transforming ast to embedding index tree...')
         programs['index_tree'] = programs['ast'].apply(ast_to_index)
 
-        programs['token_seq'] = programs['index_tree'].apply(index_to_tokens)
+        # programs['token_seq'] = programs['index_tree'].apply(index_to_tokens)
 
         w2v.save(self.w2v_path)
         print("Saved word2vec model at", self.w2v_path)

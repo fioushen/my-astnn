@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 import time
 
-from model import ASTNN
+from model_compare import ASTNN
 
-TRAINING_SET_SIZE = 128
-VALIDATION_SET_SIZE = 32
-TEST_SET_SIZE = 32
+TRAINING_SET_SIZE = 1000
+VALIDATION_SET_SIZE = 0
+TEST_SET_SIZE = 0
 
 w2v = Word2Vec.load('./data/c/w2v_128').wv
 embeddings = torch.tensor(np.vstack([w2v.vectors, [0] * 128]))
@@ -29,10 +29,10 @@ BATCH_SIZE = 64
 net = ASTNN(output_dim=max_label_id,
             embedding_dim=128, num_embeddings=len(w2v.vectors) + 1, embeddings=embeddings,
             batch_size=BATCH_SIZE)
-# net.cuda()
+net.cuda()
 
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(net.parameters())
+optimizer = torch.optim.Adamax(net.parameters())
 
 
 batches = []
@@ -40,15 +40,13 @@ losses = []
 
 t = time.time()
 
-for batch_count in range(20):
+for batch_count in range(300):
     start = time.time()
 
     data = training_set.sample(n=BATCH_SIZE)
-    input, label = data['index_tree'], torch.tensor([label - 1 for label in data['label']])
+    input, label = data['index_tree'], torch.tensor([label - 1 for label in data['label']]).cuda()
 
     output = net(input)
-
-    # label = label.cuda()
 
     loss = criterion(output, label)
     loss.backward()
