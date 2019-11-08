@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from time import time
 
 
 class TreeEncoder(nn.Module):
@@ -28,13 +29,13 @@ class TreeEncoder(nn.Module):
         self.embedding.weight.data.copy_(embeddings)
 
     def hidden_state(self, node):
-        result = torch.zeros(self.encode_dim, requires_grad=True)
-        # result = torch.zeros(self.encode_dim).cuda()
+        # result = torch.zeros(self.encode_dim, requires_grad=True)
+        result = torch.zeros(self.encode_dim).cuda()
         header = node[0]
         for node in node[1:]:
             result = result.add(self.hidden_state(node))
-        header = self.embedding(torch.tensor(header, dtype=torch.long))
-        # header = self.embedding(torch.tensor(header, dtype=torch.long).cuda())
+        # header = self.embedding(torch.tensor(header, dtype=torch.long))
+        header = self.embedding(torch.tensor(header, dtype=torch.long).cuda())
         result = result.add(self.linear(header))
         self.node_list.append(result)
         return result
@@ -89,21 +90,44 @@ class ASTNN(nn.Module):
         # [1 * output_dim]
         return self.FC(max_pool).view([-1])
 
-    def forward(self, tree_seq_batch):
-        encodes = []
-        for tree_seq in tree_seq_batch:
-            statement_vectors = [self.encoder(st_tree) for st_tree in tree_seq]
-            encodes.append(torch.cat(statement_vectors).view([-1, self.encode_dim]))
+    def forward(self, x):
+        print('*** Forwarding ***')
+        t = time()
 
-        lens = [len(v) for v in tree_seq_batch]
+        lens = [len(item) for item in x]
         max_len = max(lens)
-        encodes = [torch.cat([v, torch.zeros([max_len - len(v), self.embedding_dim])])
-                                   for v in encodes]
-        encodes = torch.cat(encodes).view([len(tree_seq_batch), -1, self.encode_dim])
-        # pack = nn.utils.rnn.pack_padded_sequence(statement_vectors_batch, lens, batch_first=True, enforce_sorted=False)
-        gru_output, hidden = self.biGRU(encodes, torch.zeros([2, self.batch_size, self.hidden_dim]))
+
+        encodes = torch.stack([self.encoder(tree) for tree_seq in x for tree in tree_seq])
+
+        print('%s\t%2.2f s' % ('Encode', time() - t))
+        t = time()
+
+        seq, start, end = [], 0, 0
+        for i in range(self.batch_size):
+            end += lens[i]
+            if max_len - lens[i]:
+                seq.append(torch.zeros(max_len - lens[i], self.encode_dim).cuda())
+            seq.append(encodes[start:end])
+            start = end
+        encodes = torch.cat(seq)
+        encodes = encodes.view(self.batch_size, max_len, -1)
+
+        print('%s\t%2.2f s' % ('Pad', time() - t))
+        t = time()
+
+        gru_output, hidden = self.biGRU(encodes, torch.zeros([2, self.batch_size, self.hidden_dim]).cuda())
+
+        print('%s\t%2.2f s' % ('GRU', time() - t))
+        t = time()
 
         # unpacked, unpacked_len = torch.nn.utils.rnn.pad_packed_sequence(gru_output, batch_first=True)
         max_pool = torch.max(gru_output, 1).values
 
-        return self.FC(max_pool)
+        print('%s\t%2.2f s' % ('Pooling', time() - t))
+        t = time()
+
+        y = self.FC(max_pool)
+
+        print('%s\t%2.2f s' % ('Linear', time() - t))
+
+        return y

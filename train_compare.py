@@ -8,9 +8,9 @@ import time
 
 from model_compare import ASTNN
 
-TRAINING_SET_SIZE = 30000
-VALIDATION_SET_SIZE = 10000
-TEST_SET_SIZE = 10000
+TRAINING_SET_SIZE = 128
+VALIDATION_SET_SIZE = 32
+TEST_SET_SIZE = 32
 
 print('Reading data...')
 
