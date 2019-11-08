@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch
-from time import time
 
 
 class TreeEncoder(nn.Module):
@@ -104,16 +103,10 @@ class ASTNN(nn.Module):
         return zeros
 
     def forward(self, x):
-        print('*** Forwarding ***')
-        t = time()
-
         lens = [len(item) for item in x]
         max_len = max(lens)
 
         encodes = self.encoder([tree for tree_seq in x for tree in tree_seq], sum(lens))
-
-        print('%s\t%2.2f s' % ('Encode', time() - t))
-        t = time()
 
         seq, start, end = [], 0, 0
         for i in range(self.batch_size):
@@ -125,27 +118,14 @@ class ASTNN(nn.Module):
         encodes = torch.cat(seq)
         encodes = encodes.view(self.batch_size, max_len, -1)
 
-        print('%s\t%2.2f s' % ('Pad', time() - t))
-        t = time()
-
         # gru
         gru_out, hidden = self.bigru(encodes, self.init_hidden())
-
-        print('%s\t%2.2f s' % ('GRU', time() - t))
-        t = time()
 
         gru_out = torch.transpose(gru_out, 1, 2)
         # pooling
         gru_out = torch.max_pool1d(gru_out, gru_out.size(2)).squeeze(2)
         # gru_out = gru_out[:,-1]
 
-        print('%s\t%2.2f s' % ('Pooling', time() - t))
-        t = time()
-
         # linear
-        y = self.hidden2label(gru_out)
-
-        print('%s\t%2.2f s' % ('Linear', time() - t))
-
-        return y
+        return self.hidden2label(gru_out)
 

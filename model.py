@@ -29,22 +29,17 @@ class TreeEncoder(nn.Module):
         self.embedding.weight.data.copy_(embeddings)
 
     def hidden_state(self, node):
-        # result = torch.zeros(self.encode_dim, requires_grad=True)
-        result = torch.zeros(self.encode_dim).cuda()
-        header = node[0]
+        h = self.linear(self.embedding(torch.tensor(node[0], dtype=torch.long).cuda()))
         for node in node[1:]:
-            result = result.add(self.hidden_state(node))
-        # header = self.embedding(torch.tensor(header, dtype=torch.long))
-        header = self.embedding(torch.tensor(header, dtype=torch.long).cuda())
-        result = result.add(self.linear(header))
-        self.node_list.append(result)
-        return result
+            h += self.hidden_state(node)
+        self.node_list.append(h)
+        return h
 
     def forward(self, st_tree):
         # here x is like [1, [2, 3]] where 1, 2, 3 are embeddings index
-        self.node_list.clear()
         self.hidden_state(st_tree)
         pool = torch.cat(self.node_list).view([-1, self.encode_dim])
+        self.node_list.clear()
         return torch.max(pool, 0).values
 
 
@@ -91,16 +86,10 @@ class ASTNN(nn.Module):
         return self.FC(max_pool).view([-1])
 
     def forward(self, x):
-        print('*** Forwarding ***')
-        t = time()
-
         lens = [len(item) for item in x]
         max_len = max(lens)
 
         encodes = torch.stack([self.encoder(tree) for tree_seq in x for tree in tree_seq])
-
-        print('%s\t%2.2f s' % ('Encode', time() - t))
-        t = time()
 
         seq, start, end = [], 0, 0
         for i in range(self.batch_size):
@@ -112,22 +101,9 @@ class ASTNN(nn.Module):
         encodes = torch.cat(seq)
         encodes = encodes.view(self.batch_size, max_len, -1)
 
-        print('%s\t%2.2f s' % ('Pad', time() - t))
-        t = time()
-
         gru_output, hidden = self.biGRU(encodes, torch.zeros([2, self.batch_size, self.hidden_dim]).cuda())
-
-        print('%s\t%2.2f s' % ('GRU', time() - t))
-        t = time()
 
         # unpacked, unpacked_len = torch.nn.utils.rnn.pad_packed_sequence(gru_output, batch_first=True)
         max_pool = torch.max(gru_output, 1).values
 
-        print('%s\t%2.2f s' % ('Pooling', time() - t))
-        t = time()
-
-        y = self.FC(max_pool)
-
-        print('%s\t%2.2f s' % ('Linear', time() - t))
-
-        return y
+        return self.FC(max_pool)

@@ -8,9 +8,9 @@ import time
 
 from model_compare import ASTNN
 
-TRAINING_SET_SIZE = 128
-VALIDATION_SET_SIZE = 32
-TEST_SET_SIZE = 32
+TRAINING_SET_SIZE = 30000
+VALIDATION_SET_SIZE = 10000
+TEST_SET_SIZE = 10000
 
 print('Reading data...')
 
@@ -33,7 +33,7 @@ MAX_LABEL = max(programs['label'])
 print('Max label:', MAX_LABEL)
 
 BATCH_SIZE = 64
-EPOCH = 2
+EPOCH = 15
 net = ASTNN(output_dim=MAX_LABEL,
             embedding_dim=128, num_embeddings=len(w2v.vectors) + 1, embeddings=embeddings,
             batch_size=BATCH_SIZE)
